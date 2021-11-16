@@ -24,25 +24,25 @@ import org.jacop.examples.fd.ExampleFD;
 public class BIBD extends ExampleFD {
 
     /**
-     * It specifies number of rows in the incidence matrix.
+     * It specifies the number of items.
      */
-    public int v = 7;
+    public int v = 4;
     /**
-     * It specifies number of columns in the incidence matrix.
+     * It specifies the number of blocks.
      */
-    public int b = 7;
+    public int b = 4;
     /**
-     * It specifies number of ones in each row.
+     * It specifies the number of times an item should appear, in total.
      */
     public int r = 3;
     /**
-     * It specifies number of ones in each column.
+     * The size of the blocks.
      */
     public int k = 3;
     /**
-     * It specifies the value of the scalar product of any two distinct rows.
+     * It specifies the number of times any two item can cooccur in blocks.
      */
-    public int lambda = 1;
+    public int lambda = 2;
 
     IntVar[][] x;
 
@@ -99,20 +99,20 @@ public class BIBD extends ExampleFD {
     public static void main(String[] args) {
         BIBD example = new BIBD();
         //v : the distinct objects
-        example.v = 600;
+        example.v = 7;
 
         //b: the number of blocks, one block being an evaluation item for a human coder
         // so b is the number of evaluations that will be done. If we think that one coder can do 100 evaluations, then b = 100 x nb of coders
-        example.b = 100;
+        example.b = 7;
 
         //k : the number of objects per block (per evaluation). For Best Worst scaling, 4 is often selected
-        example.k = 4;
+        example.k = 3;
 
         //r: the number of times an object should appear. 4 is an arbitrary but good number, no?
-        example.r = 2;
+        example.r = 3;
 
-        //lambda: the number of times a pair of items should appear in the same block. Ideally, twice I think? A good way to measure the consistency of the coder. 
-        example.lambda = 2;
+        //lambda: the number of times a pair of items should appear together in the entire set of blocks. Ideally, twice I think? A good way to measure the consistency of the coder. 
+        example.lambda = 1;
 
         example.model();
 
