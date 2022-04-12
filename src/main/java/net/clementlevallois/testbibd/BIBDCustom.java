@@ -27,7 +27,7 @@ import net.clementlevallois.utils.UnDirectedPair;
  * @param <T>
  */
 public class BIBDCustom<T extends Comparable<? super T>> {
-    
+
     int theoreticalNumberOfDistinctPairs = 0;
     int actualNumberOfDistinctPairs = 0;
     float averageTimeADistinctPairAppears = 0;
@@ -35,46 +35,53 @@ public class BIBDCustom<T extends Comparable<? super T>> {
     public static void main(String[] args) {
 
         /**
-         * It specifies the number of items.
+         * number of items.
          */
-        int v = 50;
+        Integer v = 8;
         /**
-         * It specifies the number of blocks.
+         * number of blocks. Can be null if parameter r and lambda are non null
          */
-        int b = 50;
+        Integer b = null;
         /**
-         * It specifies the number of times an item should appear, in total.
+         * number of times an item should appear, in total. Can be null if parameter b is non null 
          */
-        int r = 4;
+        Integer r = 7;
         /**
-         * The size of the blocks.
+         * size of the blocks.
          */
-        int k = 4;
+        Integer k = 4;
         /**
-         * It specifies the number of times any two item can cooccur in blocks.
+         * number of times any two items should cooccur in blocks. Can be left null if r is set.
          */
-        int lambda = 4;
+        Integer lambda = null;
 
         /**
-         * It specifies the number of annotators that will do the task.
+         * number of annotators that will do the task.
          */
-        int nbAnnotators = 1;
+        Integer nbAnnotators = null;
 
         List<Integer> items = IntStream.range(1, v + 1).boxed().collect(Collectors.toList());
         new BIBDCustom().run(items, v, b, nbAnnotators, r, k, lambda);
 
     }
+    
+    public Results run(List<T> items, Integer nbItems_v, Integer nbOfBlocks_b, Integer nbAnnotators, Integer numberOfAppearances_r, Integer blockSize_k, Integer maxNumberOfSamePairsInComparisons_lambda) {
 
-    public Results run(List<T> items, int nbItems_v, int nbOfBlocks_b, Integer nbAnnotators, int numberOfAppearances_r, int nbItemsPerBlock_k, int maxNumberOfSamePairsInComparisons_lambda) {
-
-        int countEfforts = 0;
-        int countMaxEfforts = 5;
+        int countTries = 0;
+        int countMaxTries = 5;
         List<Block> blocksSeries;
         List<List<Block>> goodSeriesOfBlocks = new ArrayList();
+
+        if (nbOfBlocks_b == null & numberOfAppearances_r == null) {
+            System.out.println("parameter b or r can be null but not both at the same time");
+            System.exit(-1);
+        }
+        
+        
+
 //        long startTime = System.currentTimeMillis();
 //        long timeElapsed = 0;
-
-        float theoreticalNbRounds = items.size() / nbItemsPerBlock_k * numberOfAppearances_r;
+        float theoreticalNbRounds = items.size() / blockSize_k * numberOfAppearances_r;
         System.out.println();
         System.out.println();
         System.out.println("theoeretical nb of rounds: " + theoreticalNbRounds);
@@ -84,45 +91,53 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         Multiset<UnDirectedPair> pairsAlreadyMade = new Multiset();
         Multiset<T> globalCountOfItems = new Multiset();
 
-        // this map helps track which pairs have not been included in blocks yet.
-        // at the beginning, all pairs are available: so we fill up the reservoir
+        // this map helps track which pairs have been included in blocks.
+        // keys: each item
+        // value for a key: the set of all items the key (item) has been paired with
+        // at the beginning, no pairs have been formed: so the values are empty sets
         Map<T, Set<T>> pairingReservoir = new HashMap();
+
         for (T item : items) {
-            Set<T> toBePairedWith = new HashSet();
-            toBePairedWith.addAll(items);
-            toBePairedWith.remove(item);
-            pairingReservoir.put(item, toBePairedWith);
+            pairingReservoir.put(item, new HashSet());
         }
 
         // a series of block is a list of blocks which cover the whole dataset (hopefully, but not guaranteed).
+        // we create as many series as there are annotators
+        // this diverges from the traditional BIBD problem
+        // to keep with the canonical BIBD, the nb of Annotators should be left null
+        // it will set the nb of Series to 
         int seriesOfBlockCompleted = 0;
         double seriesToComplete;
         if (nbAnnotators != null) {
             seriesToComplete = nbAnnotators;
         } else {
-            seriesToComplete = Math.ceil(nbOfBlocks_b / Math.floor((float) nbItems_v / (float) nbItemsPerBlock_k));
+
+            // if the nb of Annotators
+            seriesToComplete = Math.ceil(nbOfBlocks_b / Math.floor((float) nbItems_v / (float) blockSize_k));
         }
+        int loopsCounter = 0;
         while (seriesOfBlockCompleted < seriesToComplete) {
+            System.out.println("loops counter: " + loopsCounter++);
             Collections.shuffle(items, new Random());
             blocksSeries = new ArrayList();
             Integer blocksPerSeries;
             if (nbAnnotators != null) {
                 blocksPerSeries = ((Double) Math.ceil((double) nbOfBlocks_b / nbAnnotators)).intValue();
             } else {
-                blocksPerSeries = items.size() / nbItemsPerBlock_k;
+                blocksPerSeries = items.size() / blockSize_k;
             }
             Multiset<T> itemInASeriesAndTheirCount = new Multiset();
             Iterator<T> iteratorItems = items.iterator();
-            Block block = new Block(nbItemsPerBlock_k);
+            Block block = new Block(blockSize_k);
 
             while (blocksSeries.size() < blocksPerSeries) {
                 if (block.isComplete()) {
-                    block = new Block(nbItemsPerBlock_k);
+                    block = new Block(blockSize_k);
                 }
                 if (!iteratorItems.hasNext()) {
                     Collections.shuffle(items);
-                    countEfforts++;
-                    if (countEfforts > countMaxEfforts) {
+                    countTries++;
+                    if (countTries > countMaxTries) {
                         // no solution has been found. We should relax the constraint and fill in the reminding items.
                         block.setRegular(false);
                         while (!block.isComplete()) {
@@ -134,7 +149,7 @@ public class BIBDCustom<T extends Comparable<? super T>> {
                             }
                         }
                     }
-                    iteratorItems = pairingReservoir.keySet().iterator();
+                    iteratorItems = items.iterator();
                 }
                 while (iteratorItems.hasNext() & !block.isComplete()) {
                     T next = iteratorItems.next();
@@ -163,9 +178,11 @@ public class BIBDCustom<T extends Comparable<? super T>> {
                             FindAllPairs finder = new FindAllPairs();
                             Set<UnDirectedPair> allUndirectedPairs = finder.getAllUndirectedPairsFromList(existingItemsInBlockANew);
                             pairsAlreadyMade.addAllFromListOrSet(allUndirectedPairs);
-                            for (T itemsInBlock : existingItemsInBlock) {
-                                pairingReservoir.get(itemsInBlock).remove(itemToAdd);
-                                pairingReservoir.get(itemToAdd).remove(itemsInBlock);
+                            for (T itemAlreadyInBlock : existingItemsInBlock) {
+//                                pairingReservoir.get(itemsInBlock).remove(itemToAdd);
+//                                pairingReservoir.get(itemToAdd).remove(itemsInBlock);
+                                pairingReservoir.get(itemAlreadyInBlock).add(itemToAdd);
+                                pairingReservoir.get(itemToAdd).add(itemAlreadyInBlock);
                             }
                             itemInASeriesAndTheirCount.addOne(next);
                             globalCountOfItems.addOne(next);
@@ -177,9 +194,15 @@ public class BIBDCustom<T extends Comparable<? super T>> {
                             globalCountOfItems.addOne(next);
                         }
                     }
-                    Set<T> toBePaired = pairingReservoir.get(next);
+
+                    // the items to be paired with the current item are:
+                    // the list of all items
+                    // minus the items already paired with the item
+                    Set<T> toBePaired = new HashSet(items);
+                    toBePaired.removeAll(pairingReservoir.get(next));
+
                     if (!toBePaired.isEmpty() & !block.isComplete()) {
-                        T itemToPair = pairingReservoir.get(next).iterator().next();
+                        T itemToPair = toBePaired.iterator().next();
                         if (itemInASeriesAndTheirCount.getCount(itemToPair) == 1 & itemInASeriesAndTheirCount.getElementSet().size() < items.size()) {
                             continue;
                         }
@@ -206,8 +229,8 @@ public class BIBDCustom<T extends Comparable<? super T>> {
                                 Set<UnDirectedPair> allUndirectedPairs = finder.getAllUndirectedPairsFromList(existingItemsInBlockANew);
                                 pairsAlreadyMade.addAllFromListOrSet(allUndirectedPairs);
                                 for (T itemsInBlock : existingItemsInBlock) {
-                                    pairingReservoir.get(itemToAdd).remove(itemsInBlock);
-                                    pairingReservoir.get(itemsInBlock).remove(itemToAdd);
+                                    pairingReservoir.get(itemToAdd).add(itemsInBlock);
+                                    pairingReservoir.get(itemsInBlock).add(itemToAdd);
                                 }
                                 itemInASeriesAndTheirCount.addOne(itemToPair);
                                 globalCountOfItems.addOne(itemToPair);
@@ -236,7 +259,7 @@ public class BIBDCustom<T extends Comparable<? super T>> {
                 allBlocksAsSets.add(oneBlockAsSet);
             }
             System.out.println("series " + seriesCounter++ + ":");
-            System.out.println(oneSeriesOfBlocks.toString());
+//            System.out.println(oneSeriesOfBlocks.toString());
         }
         System.out.println("----------------");
         System.out.println("freq of all items: " + itemFreqs.getInternalMap().toString());
@@ -254,7 +277,7 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         averageOccValue = averageOccValue / itemFreqs.getSize();
         System.out.println("average occurrence of items: " + averageOccValue + " (to be compared with a target r of: " + numberOfAppearances_r);
 
-        float lambdaIdeal = Math.max(1,numberOfAppearances_r * (nbItemsPerBlock_k - 1) / (nbItems_v - 1));
+        float lambdaIdeal = Math.max(1, numberOfAppearances_r * (blockSize_k - 1) / (nbItems_v - 1));
 
         System.out.println("ideal lambda: " + lambdaIdeal);
         countNbOfCoAppearances(allBlocksAsSets);
@@ -265,7 +288,7 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         results.setNbItems_v(nbItems_v);
         results.setNbOfBlocks_b(nbOfBlocks_b);
         results.setActualNbOfBlocks(allBlocksAsSets.size());
-        results.setNbItemsPerBlock_k(nbItemsPerBlock_k);
+        results.setNbItemsPerBlock_k(blockSize_k);
         results.setNumberOfAppearances_r(numberOfAppearances_r);
         results.setTheoreticalNbOfDistinctPairs(theoreticalNumberOfDistinctPairs);
         results.setActualNbOfDuplicatePairs(theoreticalNumberOfDistinctPairs - actualNumberOfDistinctPairs);
@@ -274,7 +297,7 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         results.setMaxItemOccurrence(maxOccurrenceValue);
         results.setAverageItemOccurrence(averageOccValue);
         results.setLambdaIdeal(lambdaIdeal);
-        
+
         return results;
     }
 
@@ -289,8 +312,8 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         System.out.println("there are " + theoreticalNumberOfDistinctPairs + " pairs in the comparisons");
         System.out.println("when we substract the duplicates, there are only " + allUnDirectedPairs.size() + " unique pairs left");
         actualNumberOfDistinctPairs = allUnDirectedPairs.size();
-        averageTimeADistinctPairAppears = (float)theoreticalNumberOfDistinctPairs / allUnDirectedPairs.size();
-        System.out.println("which means that on average, a pair appears "+ averageTimeADistinctPairAppears+ " times.");
+        averageTimeADistinctPairAppears = (float) theoreticalNumberOfDistinctPairs / allUnDirectedPairs.size();
+        System.out.println("which means that on average, a pair appears " + averageTimeADistinctPairAppears + " times.");
     }
 
     public boolean checkGoodNeighbors(List<Set<Set<T>>> goodSetsOfComparisons, Set<Set<T>> candidateSetOfComparisons, int maxNbNeighbors) {
