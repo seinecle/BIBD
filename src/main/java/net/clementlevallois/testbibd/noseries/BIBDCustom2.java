@@ -30,6 +30,8 @@ import net.clementlevallois.utils.UnDirectedPair;
  */
 public class BIBDCustom2<T extends Comparable<? super T>> {
 
+    boolean printBlocks = true;
+
     int theoreticalNumberOfDistinctPairs = 0;
     int actualNumberOfDistinctPairs = 0;
     float averageTimeADistinctPairAppears = 0;
@@ -42,6 +44,8 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
     // value for a key: the set of all items the key (item) has been paired with
     // at the beginning, no pairs have been formed: so the values are empty sets
     Map<T, Set<T>> pairingReservoir = new HashMap();
+    int lambdaRelaxationFactor = 0;
+    int rRelaxationFactor = 0;
 
     public static void main(String[] args) {
 
@@ -52,12 +56,12 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
         /**
          * number of blocks. Can be null if parameter r and lambda are non null
          */
-        Integer b = null;
+        Integer b = 70;
         /**
          * number of times an item should appear, in total. Can be null if
          * parameter b is non null
          */
-        Integer r = null;
+        Integer r = 35;
         /**
          * size of the blocks.
          */
@@ -66,7 +70,7 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
          * number of times any two items should cooccur in blocks. Can be left
          * null if r is set.
          */
-        Integer lambda = null;
+        Integer lambda = 15;
 
         /**
          * number of annotators that will do the task.
@@ -74,7 +78,7 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
         Integer nbAnnotators = null;
 
         List<Integer> items = IntStream.range(1, v + 1).boxed().collect(Collectors.toList());
-        new BIBDCustom2().run(GOAL.CANONICAL_BIBD, items, v, b, r, k, lambda);
+        new BIBDCustom2().run(GOAL.R_KNOWN, items, v, b, r, k, lambda);
 
     }
 
@@ -84,8 +88,10 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
 
     public Results run(GOAL goal, List<T> items, Integer nbItems_v, Integer nbOfBlocks_b, Integer numberOfAppearances_r, Integer blockSize_k, Integer maxNumberOfSamePairsInComparisons_lambda) {
 
+        int globalTries = 0;
+
         int countTries = 0;
-        
+
         List<Block> blocks;
 
 //        if (nbOfBlocks_b == null & numberOfAppearances_r == null) {
@@ -126,11 +132,10 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
         // to fill nb blocks x their size
         // a count of max tries should take this number of iterations as a basis, and multiply it by
         // a factor allowing for retries - here: 5
-        int countMaxTries = Math.round(nbOfBlocks_b * blockSize_k/ nbItems_v) * 5;
-        
-        
-        
+        int countMaxTries = Math.round(nbOfBlocks_b * blockSize_k / nbItems_v) * 50;
+
         float theoretical_lambda = (float) numberOfAppearances_r * (blockSize_k - 1) / (nbItems_v - 1);
+        System.out.println("theoretical lambda: " + theoretical_lambda);
 
         for (T item : items) {
             pairingReservoir.put(item, new HashSet());
@@ -156,26 +161,49 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
             if (!iteratorItems.hasNext()) {
                 countTries++;
 
-                // verify that we have not tried too many times iterating on items
+                // exceptional regime: verify that we have not tried too many times iterating on items
                 if (countTries > countMaxTries) {
                     // no solution has been found. We should relax the constraint and fill in the remaining items.
                     blockToFill.setRegular(false);
                     T candidateItemToAdd = findCandidateFromLowFrequencyItems(blockToFill, globalCountOfItems, numberOfAppearances_r);
                     if (candidateItemToAdd == null) {
                         blockToFill = new Block(blockSize_k);
-                        Collections.shuffle(blocks);
-                        int blocksToDelete = Math.min(5, blocks.size());
-                        int deleted = 0;
-                        while (!blocks.isEmpty() & deleted < blocksToDelete) {
-                            Block blockToRemove = blocks.get(0);
-                            blocks.remove(0);
-                            removeBlock(blockToRemove);
-                            deleted++;
+                        blocks = new ArrayList();
+                        pairingReservoir = new HashMap();
+                        for (T item : items) {
+                            pairingReservoir.put(item, new HashSet());
                         }
-                        System.out.println("REMOVED " + blocksToDelete + " BLOCKS TO FIND A BETTER SOLUTION");
+
+                        pairsAlreadyMade = new Multiset();
+                        globalCountOfItems = new Multiset();
+
+                        System.out.println("REMOVED ALL BLOCKS TO FIND A BETTER SOLUTION");
 
                     } else {
-                        blockToFill = addItemToBlock(candidateItemToAdd, blockToFill, maxNumberOfSamePairsInComparisons_lambda, numberOfAppearances_r);
+                        int blockSize = blockToFill.getItems().size();
+                        blockToFill = addItemToBlock(candidateItemToAdd, blockToFill, maxNumberOfSamePairsInComparisons_lambda, numberOfAppearances_r, blocks);
+
+                        // if no item was added to the block, this means we are stuck... we should start again.
+                        if (blockToFill.getItems().size() == blockSize) {
+                            blockToFill = new Block(blockSize_k);
+                            blocks = new ArrayList();
+                            pairingReservoir = new HashMap();
+                            for (T item : items) {
+                                pairingReservoir.put(item, new HashSet());
+                            }
+
+                            pairsAlreadyMade = new Multiset();
+                            globalCountOfItems = new Multiset();
+
+                            System.out.println("REMOVED ALL BLOCKS TO FIND A BETTER SOLUTION");
+                            globalTries++;
+                            if (globalTries % 100 == 0) {
+                                lambdaRelaxationFactor++;
+                            }
+                            if (globalTries % 5_000 == 0) {
+                                rRelaxationFactor++;
+                            }
+                        }
                     }
                     countTries = 0;
                 }
@@ -183,6 +211,7 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
                 iteratorItems = items.iterator();
             }
 
+            // normal regime: we examine each item to see if we can add it to the current block
             while (iteratorItems.hasNext() & !blockToFill.isComplete()) {
                 T candidateItem = iteratorItems.next();
 
@@ -191,7 +220,7 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
                 // if the item is not in the block yet, consider the item
                 if (!existingItemsInBlock.contains(candidateItem)) {
                     // if a number of conditions are met, add the item to the block
-                    blockToFill = addItemToBlock(candidateItem, blockToFill, maxNumberOfSamePairsInComparisons_lambda, numberOfAppearances_r);
+                    blockToFill = addItemToBlock(candidateItem, blockToFill, maxNumberOfSamePairsInComparisons_lambda, numberOfAppearances_r, blocks);
                 }
             }
             if (blockToFill.isComplete()) {
@@ -202,11 +231,17 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
         Set<Set<T>> allBlocksAsSets = new HashSet();
         Set<T> oneBlockAsSet;
         for (Block completedBlock : blocks) {
+            if (printBlocks) {
+                System.out.println(completedBlock.toString());
+            }
             itemFreqs.addAllFromListOrSet(completedBlock.getItems());
             oneBlockAsSet = new HashSet(completedBlock.getItems());
             allBlocksAsSets.add(oneBlockAsSet);
         }
 
+        System.out.println("----------------");
+        System.out.println("pairsAlreadyMade: " + pairsAlreadyMade.getSize());
+        System.out.println("pairsAlreadyMade element count: " + pairsAlreadyMade.getElementSet().size());
         System.out.println("----------------");
         System.out.println("freq of all items: " + itemFreqs.getInternalMap().toString());
 
@@ -264,27 +299,11 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
             theoreticalNumberOfDistinctPairs = theoreticalNumberOfDistinctPairs + allUnDirectedPairsFromList.size();
             allUnDirectedPairs.addAll(allUnDirectedPairsFromList);
         }
-        System.out.println("there are " + theoreticalNumberOfDistinctPairs + " pairs in the comparisons");
+        System.out.println("there are " + theoreticalNumberOfDistinctPairs + " pairs in the blocks");
         System.out.println("when we substract the duplicates, there are only " + allUnDirectedPairs.size() + " unique pairs left");
         actualNumberOfDistinctPairs = allUnDirectedPairs.size();
         averageTimeADistinctPairAppears = (float) theoreticalNumberOfDistinctPairs / allUnDirectedPairs.size();
         System.out.println("which means that on average, a pair appears " + averageTimeADistinctPairAppears + " times.");
-    }
-
-    public boolean checkGoodNeighbors(List<Set<Set<T>>> goodSetsOfComparisons, Set<Set<T>> candidateSetOfComparisons, int maxNbNeighbors) {
-        int nbOfNeighbors = 0;
-        for (Set<T> oneCandidateComparison : candidateSetOfComparisons) {
-            for (Set<Set<T>> onePastSetOfComparisons : goodSetsOfComparisons) {
-                for (Set<T> onePastComparison : onePastSetOfComparisons) {
-                    Set<T> common = new HashSet(oneCandidateComparison);
-                    common.retainAll(onePastComparison);
-                    if (common.size() > 1) {
-                        nbOfNeighbors++;
-                    }
-                }
-            }
-        }
-        return nbOfNeighbors <= maxNbNeighbors;
     }
 
     public T findCandidateFromLowFrequencyItems(Block blockToFill, Multiset<T> globalCountOfItems, Integer numberOfAppearances_r) {
@@ -300,7 +319,7 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
         return null;
     }
 
-    public Block addItemToBlock(T itemToAdd, Block blockToFill, Integer maxNumberOfSamePairsInComparisons_lambda, Integer numberOfAppearances_r) {
+    public Block addItemToBlock(T itemToAdd, Block blockToFill, Integer maxNumberOfSamePairsInComparisons_lambda, Integer numberOfAppearances_r, List<Block> blocks) {
 
         List<T> existingItemsInBlock = new ArrayList();
         existingItemsInBlock.addAll(blockToFill.getItems());
@@ -312,24 +331,88 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
 //        Set<UnDirectedPair> allUndirectedPairs = finder.getAllUndirectedPairsFromList(existingItemsInBlockANew);
 //        pairsAlreadyMade.addAllFromListOrSet(allUndirectedPairs);
         if (existingItemsInBlock.isEmpty()) {
-            if (!blockToFill.isComplete() & globalCountOfItems.getCount(itemToAdd) < numberOfAppearances_r) {
+            if (!blockToFill.isComplete() & globalCountOfItems.getCount(itemToAdd) < (numberOfAppearances_r + rRelaxationFactor)) {
                 globalCountOfItems.addOne(itemToAdd);
                 blockToFill.addItem(itemToAdd);
             }
 
-        } else {
+        } else if (!blockToFill.isComplete() & globalCountOfItems.getCount(itemToAdd) < (numberOfAppearances_r + rRelaxationFactor)) {
 
-            for (T itemAlreadyInBlock : existingItemsInBlock) {
-                UnDirectedPair pair = new UnDirectedPair(itemAlreadyInBlock, itemToAdd);
-                Integer countForThisPair = pairsAlreadyMade.getCount(pair);
-                if (!blockToFill.isComplete() & countForThisPair < maxNumberOfSamePairsInComparisons_lambda & globalCountOfItems.getCount(itemToAdd) < numberOfAppearances_r) {
-                    pairingReservoir.get(itemAlreadyInBlock).add(itemToAdd);
-                    pairingReservoir.get(itemToAdd).add(itemAlreadyInBlock);
-                    pairsAlreadyMade.addOne(pair);
-                    globalCountOfItems.addOne(itemToAdd);
-                    blockToFill.addItem(itemToAdd);
+            FindAllPairs find = new FindAllPairs();
+            Set<T> blockIfItemAdded = new HashSet();
+            blockIfItemAdded.addAll(blockToFill.getItems());
+            blockIfItemAdded.add(itemToAdd);
+            Set<UnDirectedPair> allUnDirectedPairsIfItemAdded = find.getAllUndirectedPairs(blockIfItemAdded);
+            boolean adequate = true;
+
+            for (UnDirectedPair blockPair : allUnDirectedPairsIfItemAdded) {
+                Comparable<T> other = blockPair.getOther(itemToAdd);
+                if (other != null) {
+                    Integer countForThisPair = pairsAlreadyMade.getCount(blockPair);
+                    if (countForThisPair >= (maxNumberOfSamePairsInComparisons_lambda + lambdaRelaxationFactor)) {
+                        adequate = false;
+                    }
                 }
             }
+            if (adequate) {
+                blockToFill.addItem(itemToAdd);
+                globalCountOfItems.addOne(itemToAdd);
+                for (UnDirectedPair blockPair : allUnDirectedPairsIfItemAdded) {
+                    Comparable<T> other = blockPair.getOther(itemToAdd);
+                    if (other != null) {
+                        pairingReservoir.get((T) other).add(itemToAdd);
+                        pairingReservoir.get(itemToAdd).add((T) other);
+                        pairsAlreadyMade.addOne(blockPair);
+                    }
+                }
+
+            }
+
+//            boolean addedToBlock = false;
+//            for (T itemAlreadyInBlock : existingItemsInBlock) {
+//                UnDirectedPair pair = new UnDirectedPair(itemAlreadyInBlock, itemToAdd);
+//                Integer countForThisPair = pairsAlreadyMade.getCount(pair);
+//                if (!blockToFill.isComplete()
+//                        & countForThisPair < maxNumberOfSamePairsInComparisons_lambda
+//                        & globalCountOfItems.getCount(itemToAdd) < numberOfAppearances_r) {
+//                    System.out.println("----------------");
+//                    System.out.println("count for this pair (" + itemAlreadyInBlock + ", " + itemToAdd + "): " + countForThisPair);
+//
+//                    System.out.println("all blocks so far:");
+//                    for (Block completedBlock : blocks) {
+//                        System.out.println(completedBlock.toString());
+//                    }
+//
+//                    System.out.println("current block before addition: " + blockToFill.toString());
+//                    System.out.println("candidate: " + itemToAdd);
+//                    System.out.println("pairs already made: " + pairsAlreadyMade.getInternalMap().toString());
+//                    System.out.println("----------------");
+//                    blockToFill.addItem(itemToAdd);
+//                    globalCountOfItems.addOne(itemToAdd);
+//                    addedToBlock = true;
+//                    System.out.println("pair count: " + pairsAlreadyMade.getCount(pair));
+//                    for (UnDirectedPair pairCheck : pairsAlreadyMade.getElementSet()) {
+//                        if (pairsAlreadyMade.getCount(pairCheck) > maxNumberOfSamePairsInComparisons_lambda) {
+//                            System.out.println("stop");
+//                        }
+//                    }
+//                    break;
+//
+//                }
+//            }
+//            if (addedToBlock) {
+//                FindAllPairs find = new FindAllPairs();
+//                Set<UnDirectedPair> allUnDirectedPairsFromList = find.getAllUndirectedPairsFromList(blockToFill.getItems());
+//                for (UnDirectedPair blockPair : allUnDirectedPairsFromList) {
+//                    Comparable<T> other = blockPair.getOther(itemToAdd);
+//                    if (other != null) {
+//                        pairingReservoir.get((T) other).add(itemToAdd);
+//                        pairingReservoir.get(itemToAdd).add((T) other);
+//                        pairsAlreadyMade.addOne(blockPair);
+//                    }
+//                }
+//            }
+//
         }
         return blockToFill;
     }

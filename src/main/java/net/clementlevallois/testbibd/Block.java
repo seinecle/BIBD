@@ -6,7 +6,9 @@
 package net.clementlevallois.testbibd;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  *
@@ -16,7 +18,7 @@ import java.util.List;
 public class Block<T extends Comparable<? super T>> {
     
     private List<T> items;
-    private int blockSize;
+    private final int blockSize;
     private boolean regular;
     
     public Block(int blockSize){
@@ -30,6 +32,7 @@ public class Block<T extends Comparable<? super T>> {
             System.out.println("block was full");
         }else{
             items.add(item);
+            Collections.sort(items);
         }               
     }
     
@@ -49,7 +52,29 @@ public class Block<T extends Comparable<? super T>> {
         this.regular = regular;
     }
 
-    
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        for (T item: items){
+            hash = hash+item.hashCode();
+        }
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Block<?> other = (Block<?>) obj;
+        return Objects.equals(this.toString(), other.toString());
+    }
     
     @Override
     public String toString() {
