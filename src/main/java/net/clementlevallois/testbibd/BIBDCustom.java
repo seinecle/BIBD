@@ -5,6 +5,9 @@
  */
 package net.clementlevallois.testbibd;
 
+import java.io.Serializable;
+import net.clementlevallois.functions.model.bibd.Block;
+import net.clementlevallois.functions.model.bibd.BIBDResults;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,7 +29,7 @@ import net.clementlevallois.utils.UnDirectedPair;
  * @author LEVALLOIS
  * @param <T>
  */
-public class BIBDCustom<T extends Comparable<? super T>> {
+public class BIBDCustom <T extends Comparable<? super T>>  implements Serializable {
 
     int theoreticalNumberOfDistinctPairs = 0;
     int actualNumberOfDistinctPairs = 0;
@@ -61,16 +64,16 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         Integer nbAnnotators = null;
 
         List<Integer> items = IntStream.range(1, v + 1).boxed().collect(Collectors.toList());
-        new BIBDCustom().run(items, v, b, nbAnnotators, r, k, lambda);
+        new BIBDCustom().getBlocksAndMetadata(items, v, b, nbAnnotators, r, k, lambda);
 
     }
     
-    public Results run(List<T> items, Integer nbItems_v, Integer nbOfBlocks_b, Integer nbAnnotators, Integer numberOfAppearances_r, Integer blockSize_k, Integer maxNumberOfSamePairsInComparisons_lambda) {
+    public BIBDResults getBlocksAndMetadata(List<T> items, Integer nbItems_v, Integer nbOfBlocks_b, Integer nbAnnotators, Integer numberOfAppearances_r, Integer blockSize_k, Integer maxNumberOfSamePairsInComparisons_lambda) {
 
         int countTries = 0;
         int countMaxTries = 5;
-        List<Block> blocksSeries;
-        List<List<Block>> goodSeriesOfBlocks = new ArrayList();
+        List<Block<T>> blocksSeries;
+        List<List<Block<T>>> goodSeriesOfBlocks = new ArrayList();
 
         if (nbOfBlocks_b == null & numberOfAppearances_r == null) {
             System.out.println("parameter b or r can be null but not both at the same time");
@@ -88,7 +91,7 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         System.out.println();
         System.out.println();
 
-        Multiset<UnDirectedPair> pairsAlreadyMade = new Multiset();
+        Multiset pairsAlreadyMade = new Multiset();
         Multiset<T> globalCountOfItems = new Multiset();
 
         // this map helps track which pairs have been included in blocks.
@@ -126,7 +129,7 @@ public class BIBDCustom<T extends Comparable<? super T>> {
             } else {
                 blocksPerSeries = items.size() / blockSize_k;
             }
-            Multiset<T> itemInASeriesAndTheirCount = new Multiset();
+            Multiset itemInASeriesAndTheirCount = new Multiset();
             Iterator<T> iteratorItems = items.iterator();
             Block block = new Block(blockSize_k);
 
@@ -252,8 +255,8 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         Multiset<T> itemFreqs = new Multiset();
         Set<Set<T>> allBlocksAsSets = new HashSet();
         Set<T> oneBlockAsSet;
-        for (List<Block> oneSeriesOfBlocks : goodSeriesOfBlocks) {
-            for (Block block : oneSeriesOfBlocks) {
+        for (List<Block<T>> oneSeriesOfBlocks : goodSeriesOfBlocks) {
+            for (Block<T> block : oneSeriesOfBlocks) {
                 itemFreqs.addAllFromListOrSet(block.getItems());
                 oneBlockAsSet = new HashSet(block.getItems());
                 allBlocksAsSets.add(oneBlockAsSet);
@@ -282,7 +285,7 @@ public class BIBDCustom<T extends Comparable<? super T>> {
         System.out.println("ideal lambda: " + lambdaIdeal);
         countNbOfCoAppearances(allBlocksAsSets);
 
-        Results results = new Results();
+        BIBDResults results = new BIBDResults();
         results.setSeriesOfBlocks(goodSeriesOfBlocks);
         results.setNbAnnotators(nbAnnotators);
         results.setNbItems_v(nbItems_v);

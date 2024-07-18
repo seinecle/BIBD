@@ -5,6 +5,7 @@
  */
 package net.clementlevallois.testbibd;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import org.jacop.constraints.AndBool;
@@ -21,7 +22,7 @@ import org.jacop.examples.fd.ExampleFD;
  * 
  * Other useful source: https://www.csplib.org/Problems/prob028/
  */
-public class BIBD extends ExampleFD {
+public class BIBD extends ExampleFD implements Serializable {
 
     /**
      * It specifies the number of items.

@@ -5,6 +5,7 @@
  */
 package net.clementlevallois.testbibd.noseries;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -17,8 +18,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import net.clementlevallois.testbibd.Block;
-import net.clementlevallois.testbibd.Results;
+import net.clementlevallois.functions.model.bibd.Block;
+import net.clementlevallois.functions.model.bibd.BIBDResults;
 import net.clementlevallois.utils.FindAllPairs;
 import net.clementlevallois.utils.Multiset;
 import net.clementlevallois.utils.UnDirectedPair;
@@ -28,7 +29,7 @@ import net.clementlevallois.utils.UnDirectedPair;
  * @author LEVALLOIS
  * @param <T>
  */
-public class BIBDCustom2<T extends Comparable<? super T>> {
+public class BIBDCustom2 <T extends Comparable<? super T>> implements Serializable {
 
     boolean printBlocks = true;
 
@@ -36,8 +37,8 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
     int actualNumberOfDistinctPairs = 0;
     float averageTimeADistinctPairAppears = 0;
 
-    Multiset<UnDirectedPair> pairsAlreadyMade = new Multiset();
-    Multiset<T> globalCountOfItems = new Multiset();
+    Multiset pairsAlreadyMade = new Multiset();
+    Multiset globalCountOfItems = new Multiset();
 
     // this map helps track which pairs have been included in blocks.
     // keys: each item
@@ -86,7 +87,7 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
         CANONICAL_BIBD, LAMBDA_KNOWN, R_KNOWN
     }
 
-    public Results run(GOAL goal, List<T> items, Integer nbItems_v, Integer nbOfBlocks_b, Integer numberOfAppearances_r, Integer blockSize_k, Integer maxNumberOfSamePairsInComparisons_lambda) {
+    public BIBDResults run(GOAL goal, List<T> items, Integer nbItems_v, Integer nbOfBlocks_b, Integer numberOfAppearances_r, Integer blockSize_k, Integer maxNumberOfSamePairsInComparisons_lambda) {
 
         int globalTries = 0;
 
@@ -264,7 +265,7 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
         System.out.println("ideal lambda: " + lambdaIdeal);
         countNbOfCoAppearances(allBlocksAsSets);
 
-        Results results = new Results();
+        BIBDResults results = new BIBDResults();
 
         results.setNbItems_v(nbItems_v);
 
@@ -306,7 +307,7 @@ public class BIBDCustom2<T extends Comparable<? super T>> {
         System.out.println("which means that on average, a pair appears " + averageTimeADistinctPairAppears + " times.");
     }
 
-    public T findCandidateFromLowFrequencyItems(Block blockToFill, Multiset<T> globalCountOfItems, Integer numberOfAppearances_r) {
+    public T findCandidateFromLowFrequencyItems(Block blockToFill, Multiset globalCountOfItems, Integer numberOfAppearances_r) {
         if (!blockToFill.isComplete()) {
             List<Map.Entry<T, Integer>> asc = globalCountOfItems.sortAsc(globalCountOfItems);
             for (Map.Entry<T, Integer> entry : asc) {

@@ -1,0 +1,28 @@
+designer:efkfeae1554:meta:email:levallois@em-lyon.com -> Json object with list of tasks
+
+task:zdzdafzff:rawdata -> Redis list of items.
+
+annotator:email:levallois@em-lyon.com:password:fjzivjzievzievjiez -> Json object with list of tasks in the form of key value pairs where the value is an empty string: {taskId: ""}
+
+task:fjziejeaeee -> Json object with metadata
+
+task:fjziejeaeee:data -> BLOCKS: Json object with block series  CATEGORIZATION: redis list of items
+
+task:fjziejeaeee:annotators -> 
+                    BLOCKS: Json object with key value pairs where the key is the series number and the value is a Json Array of emails of annotators
+                    CATEGORIZATION: Json object with key value pairs where the key is "0" and the value is a Json Array of emails of annotators
+
+
+ANNOTATIONS
+task:fjziejeaeee:annotations:raw -> 
+                    BLOCKS: REDIS LIST where the index corresponds to the series index. At each index, a Json String stores all the blocks evaluated. There can be more blocks evaluated than originally (a block appearing several times because annotated several times).
+                    CATEGORIES: REDIS SET made of: item_index:levallois@em-lyon.com:category1:category2:etc
+
+task:fefezf:annotations:indices:last_index:annotator:levallois@eml-yon.com -> INT
+
+FOR CATEGORIES ONLY:
+task:fefezf:annotations:annotator:levallois@eml-yon.com:comments -> REDIS SET made of: item_index:comment
+
+task:fefezf:annotations:indices:nb_evaluated_total:annotator:levallois@eml-yon.com -> INT
+
+task:fefezf:annotations:indices:counter_bws-> REDIS LIST of int // the counts are matched with the items in rawdata because they have the same indices in the 2 lists
